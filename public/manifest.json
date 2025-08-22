@@ -1,0 +1,33 @@
+{
+  "name": "Calendar Reminder PWA",
+  "short_name": "CalendarReminder",
+  "description": "Never miss an important event with smart calendar reminders",
+  "theme_color": "#3b82f6",
+  "background_color": "#ffffff",
+  "display": "standalone",
+  "orientation": "portrait",
+  "scope": "/",
+  "start_url": "/",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    }
+  ],
+  "categories": ["productivity", "utilities"],
+  "shortcuts": [
+    {
+      "name": "View Calendar",
+      "short_name": "Calendar",
+      "description": "View your upcoming events",
+      "url": "/",
+      "icons": [
+        {
+          "src": "/favicon.ico",
+          "sizes": "64x64"
+        }
+      ]
+    }
+  ]
+}

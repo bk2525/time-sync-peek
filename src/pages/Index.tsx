@@ -1,12 +1,87 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { useAuth } from '@/hooks/useAuth';
+import { AuthPage } from '@/components/auth/AuthPage';
+import { Navbar } from '@/components/Navbar';
+import { CalendarView } from '@/components/CalendarView';
+import { useEffect, useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 const Index = () => {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
+  const { user, loading } = useAuth();
+  const [isConnectedToGoogle, setIsConnectedToGoogle] = useState(false);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    // Check if user has Google tokens after OAuth
+    const checkGoogleConnection = async () => {
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('google_access_token')
+          .eq('user_id', user.id)
+          .single();
+
+        setIsConnectedToGoogle(!!profile?.google_access_token);
+      }
+    };
+
+    checkGoogleConnection();
+  }, [user]);
+
+  // Handle OAuth callback and token extraction
+  useEffect(() => {
+    const handleOAuthCallback = async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const accessToken = urlParams.get('access_token');
+      const refreshToken = urlParams.get('refresh_token');
+
+      if (accessToken && refreshToken && user) {
+        try {
+          await supabase.functions.invoke('google-calendar-sync', {
+            body: { 
+              action: 'saveTokens', 
+              accessToken, 
+              refreshToken 
+            },
+          });
+
+          setIsConnectedToGoogle(true);
+          toast({
+            title: 'Google Calendar connected!',
+            description: 'Your calendar is now synced',
+          });
+
+          // Clean up URL
+          window.history.replaceState({}, document.title, '/');
+        } catch (error) {
+          console.error('Error saving tokens:', error);
+        }
+      }
+    };
+
+    if (user && !loading) {
+      handleOAuthCallback();
+    }
+  }, [user, loading, toast]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
+    );
+  }
+
+  if (!user) {
+    return <AuthPage />;
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      <Navbar />
+      <main className="container mx-auto px-4 py-8">
+        <CalendarView />
+      </main>
     </div>
   );
 };
