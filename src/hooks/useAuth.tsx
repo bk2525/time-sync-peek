@@ -78,6 +78,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       options: {
         scopes: 'openid email profile https://www.googleapis.com/auth/calendar.readonly',
         redirectTo: `${window.location.origin}/`,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent'
+        }
       },
     });
     return { error };

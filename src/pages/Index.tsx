@@ -35,15 +35,29 @@ const Index = () => {
       const accessToken = urlParams.get('access_token');
       const refreshToken = urlParams.get('refresh_token');
 
+      console.log('OAuth callback check:', { 
+        hasAccessToken: !!accessToken, 
+        hasRefreshToken: !!refreshToken,
+        userId: user?.id 
+      });
+
       if (accessToken && refreshToken && user) {
         try {
-          await supabase.functions.invoke('google-calendar-sync', {
+          console.log('Saving Google tokens...');
+          const { data, error } = await supabase.functions.invoke('google-calendar-sync', {
             body: { 
               action: 'saveTokens', 
               accessToken, 
               refreshToken 
             },
           });
+
+          console.log('Save tokens result:', { data, error });
+
+          if (error) {
+            console.error('Error saving tokens:', error);
+            throw error;
+          }
 
           setIsConnectedToGoogle(true);
           toast({
@@ -55,6 +69,11 @@ const Index = () => {
           window.history.replaceState({}, document.title, '/');
         } catch (error) {
           console.error('Error saving tokens:', error);
+          toast({
+            title: 'Connection failed',
+            description: 'Failed to connect Google Calendar',
+            variant: 'destructive',
+          });
         }
       }
     };
