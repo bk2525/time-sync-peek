@@ -55,15 +55,31 @@ serve(async (req) => {
     }
 
     if (action === 'syncEvents') {
+      console.log('Starting syncEvents for user:', user.id);
+      
       // Get user's Google tokens
-      const { data: profile } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('google_access_token, google_refresh_token, google_token_expires_at')
         .eq('user_id', user.id)
         .single();
 
+      console.log('Profile query result:', { profile, profileError });
+
+      if (profileError) {
+        console.error('Profile fetch error:', profileError);
+        return new Response(JSON.stringify({ 
+          error: 'Failed to fetch user profile', 
+          details: profileError.message 
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
       if (!profile?.google_access_token) {
-        return new Response(JSON.stringify({ error: 'No Google access token found' }), {
+        console.log('No Google access token found for user');
+        return new Response(JSON.stringify({ error: 'No Google access token found. Please connect your Google Calendar first.' }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
