@@ -53,18 +53,26 @@ export const CalendarView = () => {
         body: { action: 'syncEvents' },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Sync error:', error);
+        throw error;
+      }
+
+      if (data?.error) {
+        throw new Error(data.error);
+      }
 
       toast({
         title: 'Calendar synced successfully',
-        description: `${data.eventsCount} events synchronized`,
+        description: `${data.eventsCount || 0} events synchronized`,
       });
 
       await fetchEvents();
     } catch (error: any) {
+      console.error('Full sync error:', error);
       toast({
         title: 'Sync failed',
-        description: error.message || 'Failed to sync with Google Calendar',
+        description: error.message || 'Failed to sync with Google Calendar. Please sign in with Google first.',
         variant: 'destructive',
       });
     } finally {
