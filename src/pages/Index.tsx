@@ -28,47 +28,42 @@ const Index = () => {
     checkGoogleConnection();
   }, [user]);
 
-  // Handle OAuth callback and token extraction
+  // Handle OAuth callback and save Google tokens
   useEffect(() => {
-    const handleOAuthCallback = async () => {
-      const urlParams = new URLSearchParams(window.location.search);
-      const accessToken = urlParams.get('access_token');
-      const refreshToken = urlParams.get('refresh_token');
-
-      console.log('OAuth callback check:', { 
-        hasAccessToken: !!accessToken, 
-        hasRefreshToken: !!refreshToken,
-        userId: user?.id 
-      });
-
-      if (accessToken && refreshToken && user) {
+    const saveGoogleTokens = async () => {
+      if (user && user.app_metadata?.providers?.includes('google')) {
+        console.log('User signed in with Google, getting tokens...');
+        
         try {
-          console.log('Saving Google tokens...');
-          const { data, error } = await supabase.functions.invoke('google-calendar-sync', {
-            body: { 
-              action: 'saveTokens', 
-              accessToken, 
-              refreshToken 
-            },
-          });
+          // Get the session which contains the provider token
+          const { data: { session } } = await supabase.auth.getSession();
+          
+          if (session?.provider_token && session?.provider_refresh_token) {
+            console.log('Found Google tokens, saving...');
+            
+            const { data, error } = await supabase.functions.invoke('google-calendar-sync', {
+              body: { 
+                action: 'saveTokens', 
+                accessToken: session.provider_token, 
+                refreshToken: session.provider_refresh_token 
+              },
+            });
 
-          console.log('Save tokens result:', { data, error });
+            if (error) {
+              console.error('Error saving tokens:', error);
+              throw error;
+            }
 
-          if (error) {
-            console.error('Error saving tokens:', error);
-            throw error;
+            setIsConnectedToGoogle(true);
+            toast({
+              title: 'Google Calendar connected!',
+              description: 'Your calendar is now synced',
+            });
+          } else {
+            console.log('No Google tokens found in session');
           }
-
-          setIsConnectedToGoogle(true);
-          toast({
-            title: 'Google Calendar connected!',
-            description: 'Your calendar is now synced',
-          });
-
-          // Clean up URL
-          window.history.replaceState({}, document.title, '/');
         } catch (error) {
-          console.error('Error saving tokens:', error);
+          console.error('Error saving Google tokens:', error);
           toast({
             title: 'Connection failed',
             description: 'Failed to connect Google Calendar',
@@ -79,7 +74,7 @@ const Index = () => {
     };
 
     if (user && !loading) {
-      handleOAuthCallback();
+      saveGoogleTokens();
     }
   }, [user, loading, toast]);
 
