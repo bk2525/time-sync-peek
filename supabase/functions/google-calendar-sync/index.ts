@@ -30,6 +30,7 @@ serve(async (req) => {
     const { action, accessToken, refreshToken } = await req.json();
 
     if (action === 'saveTokens') {
+      console.log('Saving Google OAuth tokens for user:', user.id);
       // Save Google OAuth tokens to user profile
       const { error } = await supabase
         .from('profiles')
@@ -43,12 +44,13 @@ serve(async (req) => {
 
       if (error) {
         console.error('Error saving tokens:', error);
-        return new Response(JSON.stringify({ error: 'Failed to save tokens' }), {
+        return new Response(JSON.stringify({ error: 'Failed to save tokens', details: error.message }), {
           status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
+      console.log('Tokens saved successfully');
       return new Response(JSON.stringify({ success: true }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -87,7 +89,8 @@ serve(async (req) => {
 
       // Check if token needs refresh
       let accessToken = profile.google_access_token;
-      if (new Date() >= new Date(profile.google_token_expires_at)) {
+      if (profile.google_token_expires_at && new Date() >= new Date(profile.google_token_expires_at)) {
+        console.log('Token expired, refreshing...');
         // Refresh token
         const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
           method: 'POST',
@@ -100,7 +103,10 @@ serve(async (req) => {
           }),
         });
 
+        console.log('Refresh response status:', refreshResponse.status);
         const refreshData = await refreshResponse.json();
+        console.log('Refresh response data:', refreshData);
+        
         if (refreshData.access_token) {
           accessToken = refreshData.access_token;
           // Update stored token
@@ -111,7 +117,16 @@ serve(async (req) => {
               google_token_expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
             })
             .eq('user_id', user.id);
+          console.log('Token refreshed successfully');
+        } else {
+          console.error('Failed to refresh token:', refreshData);
+          return new Response(JSON.stringify({ error: 'Failed to refresh Google access token. Please reconnect your Google Calendar.' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
         }
+      } else {
+        console.log('Token is still valid');
       }
 
       // Fetch events from Google Calendar
