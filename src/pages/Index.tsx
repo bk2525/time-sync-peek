@@ -49,16 +49,22 @@ const Index = () => {
               },
             });
 
+            console.log('Save tokens result:', { data, error });
+
             if (error) {
               console.error('Error saving tokens:', error);
-              throw error;
+              toast({
+                title: 'Connection failed',
+                description: `Failed to save Google tokens: ${error.message}`,
+                variant: 'destructive',
+              });
+            } else {
+              setIsConnectedToGoogle(true);
+              toast({
+                title: 'Google Calendar connected!',
+                description: 'Your calendar is now synced',
+              });
             }
-
-            setIsConnectedToGoogle(true);
-            toast({
-              title: 'Google Calendar connected!',
-              description: 'Your calendar is now synced',
-            });
           } else {
             console.log('No Google tokens found in session');
           }

@@ -27,15 +27,20 @@ export const CalendarView = () => {
   const fetchEvents = async () => {
     setLoading(true);
     try {
+      console.log('Fetching events...');
+      
       const { data, error } = await supabase
         .from('events')
         .select('*')
         .gte('start_time', new Date().toISOString())
         .order('start_time');
 
+      console.log('Events fetch result:', { data, error, count: data?.length });
+
       if (error) throw error;
       setEvents(data || []);
     } catch (error) {
+      console.error('Error fetching events:', error);
       toast({
         title: 'Error fetching events',
         description: 'Failed to load your calendar events',
@@ -67,7 +72,10 @@ export const CalendarView = () => {
         description: `${data.eventsCount || 0} events synchronized`,
       });
 
-      await fetchEvents();
+      // Wait a moment for the database to update, then refresh
+      setTimeout(() => {
+        fetchEvents();
+      }, 1000);
     } catch (error: any) {
       console.error('Full sync error:', error);
       toast({
