@@ -54,33 +54,50 @@ export const CalendarView = () => {
   const syncWithGoogle = async () => {
     setSyncing(true);
     try {
+      console.log('Starting Google Calendar sync...');
+      
       const { data, error } = await supabase.functions.invoke('google-calendar-sync', {
         body: { action: 'syncEvents' },
       });
 
+      console.log('Sync response:', { data, error });
+
       if (error) {
-        console.error('Sync error:', error);
-        throw error;
+        console.error('Supabase function error:', error);
+        toast({
+          title: 'Sync failed',
+          description: `Connection error: ${error.message}. Please check your Google Calendar connection.`,
+          variant: 'destructive',
+        });
+        return;
       }
 
       if (data?.error) {
-        throw new Error(data.error);
+        console.error('Function returned error:', data.error);
+        toast({
+          title: 'Sync failed',
+          description: data.error,
+          variant: 'destructive',
+        });
+        return;
       }
 
+      console.log('Sync successful, events count:', data?.eventsCount);
       toast({
         title: 'Calendar synced successfully',
-        description: `${data.eventsCount || 0} events synchronized`,
+        description: `${data?.eventsCount || 0} events synchronized`,
       });
 
       // Wait a moment for the database to update, then refresh
       setTimeout(() => {
         fetchEvents();
       }, 1000);
+      
     } catch (error: any) {
-      console.error('Full sync error:', error);
+      console.error('Sync exception:', error);
       toast({
         title: 'Sync failed',
-        description: error.message || 'Failed to sync with Google Calendar. Please sign in with Google first.',
+        description: error.message || 'Network error. Please check your connection and try again.',
         variant: 'destructive',
       });
     } finally {
