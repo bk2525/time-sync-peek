@@ -32,11 +32,14 @@ const Index = () => {
   useEffect(() => {
     const saveGoogleTokens = async () => {
       if (user && user.app_metadata?.providers?.includes('google')) {
-        console.log('User signed in with Google, getting tokens...');
+        console.log('User signed in with Google, checking session...');
         
         try {
-          // Get the session which contains the provider token
+          // Get the session which should contain provider tokens
           const { data: { session } } = await supabase.auth.getSession();
+          console.log('Full session data:', session);
+          console.log('Provider token:', session?.provider_token ? 'Present' : 'Missing');
+          console.log('Provider refresh token:', session?.provider_refresh_token ? 'Present' : 'Missing');
           
           if (session?.provider_token && session?.provider_refresh_token) {
             console.log('Found Google tokens, saving...');
@@ -58,6 +61,13 @@ const Index = () => {
                 description: `Failed to save Google tokens: ${error.message}`,
                 variant: 'destructive',
               });
+            } else if (data?.error) {
+              console.error('Function returned error:', data.error);
+              toast({
+                title: 'Connection failed', 
+                description: `Failed to save Google tokens: ${data.error}`,
+                variant: 'destructive',
+              });
             } else {
               setIsConnectedToGoogle(true);
               toast({
@@ -66,10 +76,16 @@ const Index = () => {
               });
             }
           } else {
-            console.log('No Google tokens found in session');
+            console.log('No Google provider tokens found in session');
+            console.log('This likely means Google OAuth is not configured to return provider tokens');
+            toast({
+              title: 'Connection issue',
+              description: 'Google OAuth tokens not found. Please check your Google OAuth configuration in Supabase.',
+              variant: 'destructive',
+            });
           }
         } catch (error) {
-          console.error('Error saving Google tokens:', error);
+          console.error('Error in token saving process:', error);
           toast({
             title: 'Connection failed',
             description: 'Failed to connect Google Calendar',
