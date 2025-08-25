@@ -226,72 +226,149 @@ serve(async (req) => {
 
       // Fetch events from Google Calendar
       const timeMin = new Date().toISOString();
-      const timeMax = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); // Next 7 days
+      const timeMax = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(); // Extended to 30 days
 
-      console.log('Fetching calendar events...');
+      console.log('Calendar API request:', {
+        timeMin,
+        timeMax,
+        url: `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${timeMin}&timeMax=${timeMax}&singleEvents=true&orderBy=startTime&maxResults=50`
+      });
 
       try {
-        const calendarResponse = await fetch(
-          `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${timeMin}&timeMax=${timeMax}&singleEvents=true&orderBy=startTime`,
+        // First, let's check what calendars the user has access to
+        const calendarsResponse = await fetch(
+          'https://www.googleapis.com/calendar/v3/users/me/calendarList',
           {
             headers: { Authorization: `Bearer ${accessToken}` },
           }
         );
 
-        console.log('Calendar API response status:', calendarResponse.status);
+        if (calendarsResponse.ok) {
+          const calendarsData = await calendarsResponse.json();
+          console.log('Available calendars:', calendarsData.items?.map(cal => ({
+            id: cal.id,
+            summary: cal.summary,
+            primary: cal.primary
+          })));
+        }
 
+        // Now fetch events from primary calendar
+        const calendarResponse = await fetch(
+          `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${timeMin}&timeMax=${timeMax}&singleEvents=true&orderBy=startTime&maxResults=50`,
+          {
+            headers: { Authorization: `Bearer ${accessToken}` },
+          }
+        );
+
+        console.log('Calendar API response:', {
+          status: calendarResponse.status,
+          statusText: calendarResponse.statusText,
+          headers: Object.fromEntries(calendarResponse.headers.entries())
+        });
+
+        const calendarData = await calendarResponse.json();
+        
+        console.log('Calendar API data:', {
+          totalItems: calendarData.items?.length || 0,
+          hasNextPageToken: !!calendarData.nextPageToken,
+          summary: calendarData.summary,
+          timeZone: calendarData.timeZone,
+          firstFewEvents: calendarData.items?.slice(0, 3)?.map(e => ({
+            id: e.id,
+            summary: e.summary,
+            start: e.start,
+            end: e.end,
+            hasDateTime: !!e.start?.dateTime
+          }))
+        });
+        
         if (!calendarResponse.ok) {
-          const errorText = await calendarResponse.text();
-          console.error('Calendar API error:', errorText);
+          console.error('Calendar API error details:', calendarData);
           return new Response(JSON.stringify({ 
             error: 'Failed to fetch calendar events',
-            details: errorText
+            details: calendarData,
+            apiStatus: calendarResponse.status
           }), {
             status: calendarResponse.status,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
 
-        const calendarData = await calendarResponse.json();
-        console.log(`Found ${calendarData.items?.length || 0} events`);
-
         // Save events to database
         const events = calendarData.items || [];
         let savedEventsCount = 0;
+        let skippedEventsCount = 0;
+        const saveErrors = [];
+
+        console.log(`Processing ${events.length} events from Google Calendar`);
 
         for (const event of events) {
-          if (!event.start?.dateTime) continue;
+          console.log('Processing event:', {
+            id: event.id,
+            summary: event.summary,
+            hasStartDateTime: !!event.start?.dateTime,
+            startDate: event.start?.date,
+            startDateTime: event.start?.dateTime
+          });
+
+          if (!event.start?.dateTime && !event.start?.date) {
+            skippedEventsCount++;
+            console.log('Skipped event (no start time):', event.id);
+            continue;
+          }
 
           try {
-            const { error: eventError } = await supabase
+            const startTime = event.start.dateTime || event.start.date;
+            const endTime = event.end?.dateTime || event.end?.date || startTime;
+
+            const { error: eventError, data: eventData } = await supabase
               .from('events')
               .upsert({
                 user_id: user.id,
                 google_event_id: event.id,
                 title: event.summary || 'Untitled Event',
                 description: event.description || '',
-                start_time: event.start.dateTime,
-                end_time: event.end?.dateTime || event.start.dateTime,
+                start_time: startTime,
+                end_time: endTime,
                 location: event.location || '',
                 updated_at: new Date().toISOString()
               }, { onConflict: 'google_event_id' });
 
             if (eventError) {
               console.error('Error saving event:', event.id, eventError);
+              saveErrors.push({ eventId: event.id, error: eventError });
             } else {
               savedEventsCount++;
+              console.log('Successfully saved event:', event.id);
             }
           } catch (eventSaveError) {
             console.error('Exception saving event:', event.id, eventSaveError);
+            saveErrors.push({ eventId: event.id, error: eventSaveError.message });
           }
         }
 
-        console.log(`Successfully saved ${savedEventsCount} events`);
+        console.log('Final results:', {
+          totalEventsFromGoogle: events.length,
+          savedEventsCount,
+          skippedEventsCount,
+          saveErrorsCount: saveErrors.length,
+          saveErrors: saveErrors.slice(0, 3) // First 3 errors
+        });
 
         return new Response(JSON.stringify({ 
           success: true, 
           eventsCount: savedEventsCount,
-          totalEvents: events.length
+          totalEvents: events.length,
+          skippedEvents: skippedEventsCount,
+          saveErrors: saveErrors.length,
+          debug: {
+            timeRange: { timeMin, timeMax },
+            calendarSummary: calendarData.summary,
+            firstEventSample: events[0] ? {
+              summary: events[0].summary,
+              start: events[0].start
+            } : null
+          }
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
