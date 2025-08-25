@@ -56,6 +56,18 @@ export const CalendarView = () => {
     try {
       console.log('Starting Google Calendar sync...');
       
+      // ADD THIS - check if we have tokens first
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('google_access_token, google_refresh_token')
+        .eq('user_id', (await supabase.auth.getUser()).data.user?.id)
+        .single();
+      
+      console.log('Profile check before sync:', { 
+        hasAccessToken: !!profile?.google_access_token,
+        hasRefreshToken: !!profile?.google_refresh_token 
+      });
+      
       const { data, error } = await supabase.functions.invoke('google-calendar-sync', {
         body: { action: 'syncEvents' },
       });
