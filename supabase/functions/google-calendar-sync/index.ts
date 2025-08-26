@@ -320,7 +320,13 @@ serve(async (req) => {
           try {
             const startTime = event.start.dateTime || event.start.date;
             const endTime = event.end?.dateTime || event.end?.date || startTime;
-
+console.log('ABOUT TO SAVE EVENT:', JSON.stringify({
+  eventId: event.id,
+  title: event.summary,
+  user_id: user.id,
+  start_time: startTime,
+  end_time: endTime
+}, null, 2));
             const { error: eventError, data: eventData } = await supabase
               .from('events')
               .upsert({
