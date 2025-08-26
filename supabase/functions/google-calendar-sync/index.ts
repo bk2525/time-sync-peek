@@ -335,8 +335,11 @@ serve(async (req) => {
               }, { onConflict: 'google_event_id' });
 
             if (eventError) {
-              console.error('Error saving event:', event.id, eventError);
-              saveErrors.push({ eventId: event.id, error: eventError });
+console.log('EXACT SAVE ERROR:', JSON.stringify({
+  eventId: event.id,
+  error: eventError,
+  userData: { user_id: user.id, email: user.email }
+}, null, 2));              saveErrors.push({ eventId: event.id, error: eventError });
             } else {
               savedEventsCount++;
               console.log('Successfully saved event:', event.id);
