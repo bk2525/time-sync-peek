@@ -316,10 +316,6 @@ serve(async (req) => {
             console.log('Skipped event (no start time):', event.id);
             continue;
           }
-
-          try {
-            const startTime = event.start.dateTime || event.start.date;
-            const endTime = event.end?.dateTime || event.end?.date || startTime;
 console.log('ABOUT TO SAVE EVENT:', JSON.stringify({
   eventId: event.id,
   title: event.summary,
@@ -327,6 +323,10 @@ console.log('ABOUT TO SAVE EVENT:', JSON.stringify({
   start_time: startTime,
   end_time: endTime
 }, null, 2));
+          try {
+            const startTime = event.start.dateTime || event.start.date;
+            const endTime = event.end?.dateTime || event.end?.date || startTime;
+
             const { error: eventError, data: eventData } = await supabase
               .from('events')
               .upsert({
